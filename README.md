@@ -44,6 +44,12 @@ Conflict data: [UCDP Georeferenced Event Dataset (GED)](https://ucdp.uu.se/)
 
 --- 
 
-### Web Scraper
+## Web Scraper
+
+This tool automates the extraction of firm-level information from the Orbis database environment to support empirical research. It was designed to streamline data collection workflows and free time for analysis.
+
+Key features:
+* Logs in securely and retrieves a list of firms
+* Searches each firm in the database interface and downloads thier associated patent portfolios
 
 
