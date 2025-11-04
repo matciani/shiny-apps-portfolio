@@ -21,7 +21,7 @@ import time
 import os
 import pandas as pd
 
-download_dir = r"C:\Users\Ciani\Desktop\PortfolioPatentData\PATSTAT RAW"  ### DEFINE YOUR DOWNLOAD DIRECTORY HERE
+download_dir = r"C:\Users\"  ### DEFINE YOUR DOWNLOAD DIRECTORY HERE
 os.makedirs(download_dir, exist_ok=True)
 
 options = Options()
@@ -75,11 +75,11 @@ except Exception:
 # Please double-check them 
 
 EMAIL = "matilde.ciani@ifw-kiel.de" ## DEFINE YOUR USERNAME HERE
-PASSWORD = "Puzzifratello4242!" ### DEFINE YOUR PASSWORD HERE
+PASSWORD = "" ### DEFINE YOUR PASSWORD HERE
 
-LOGOUT_URL ="https://orbis-r1.bvdinfo.com/version-20250325-6-0/Orbis/1/Companies/Login/LogOut/ext?setLanguage=en" #### DEFINE YOUR LOGOUT PAGE HERE
-input_dir = r"C:\Users\Ciani\Desktop\PortfolioPatentData" ### DEFINE YOUR INPUT DIRECTORY HERE
-INPUT_FILENAME = "Top100DisruptiveLicensesPATSTAT.xlsx" ### DEFINE YOUR INPUT FILENAME HERE
+LOGOUT_URL ="" #### DEFINE YOUR LOGOUT PAGE HERE
+input_dir = r"C:\Users\" ### DEFINE YOUR INPUT DIRECTORY HERE
+INPUT_FILENAME = "FILE.xlsx" ### DEFINE YOUR INPUT FILENAME HERE
 SHEET_NAME = "NA" ### DEFINE YOUR INPUT SHEET NAME HERE
 COLUMN_NAME = "company_name" ### DEFINE YOUR INPUT COLUMN NAME HERE
 MAXVALUE = 100 ### DEFINE THE MAXIMUM NUMBER OF COMPANIES TO PROCESS HERE (if you want to process all companies, set it to None)
@@ -505,5 +505,6 @@ finally:
     time.sleep(2)
 
     driver.quit()
+
 
 
