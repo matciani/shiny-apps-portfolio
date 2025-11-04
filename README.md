@@ -7,7 +7,7 @@ They are not "end-goals" or outputs, but instruments that I have built for mysel
 
 ### Structural Breaks in HS6 code
 
-The goal of the research project is to analyse what happens to incumbents of old technologies. To better identify this "old technologies" and have a better overview of the large dataset we are using, I built this dashboards to look at the trends in the value of trade all HS6 goods available in the BACI data. One can text search for any good. Furthermore, I replicated the IGPC Indicator (Fezter et alii 2024) that takes into consideration not only value of trade of good i, but also all values of connected goods. Lastly, we used the conversion table from PATSTAT to connect HS6 goods to IPC classes to learn more about the levels of innovation within that sector. 
+The goal of the research project is to analyse what happens to incumbents of old technologies. To better identify this "old technologies" and have a better overview of the large dataset we are using, I built this dashboards to look at the trends in the value of trade all HS6 goods available in the BACI data. One can text search for any good. Furthermore, I replicated the IGPC Indicator (Fetzer et alii 2024) that takes into consideration not only value of trade of good i, but also all values of connected goods. Lastly, we used the conversion table from PATSTAT to connect HS6 goods to IPC classes to learn more about the levels of innovation within that sector. 
 
 **App:** [Shiny Link](https://matciani.shinyapps.io/structural_breaks/#section-trade-data)  
 **Code:** `Structural Breaks in HS6 goods.Rmd`
