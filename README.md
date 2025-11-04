@@ -14,21 +14,19 @@ The goal of the research project is to analyse what happens to incumbents of old
 
 
 #### Sources:
-Trade data: 
-Integrated Global Product Centrality: 
-Patent Data: PATSTAT 
+Trade data: [BACI CEPII](https://www.cepii.fr/CEPII/en/bdd_modele/bdd_modele_item.asp?id=37)
+Integrated Global Product Centrality: [AI-Generated Production Network](https://aipnet.io/paper/) 
+Patent Data: [PATSTAT](https://www.epo.org/en/searching-for-patents/business/patstat) 
 
 ---
 
 ### Geography of Conflicts
 
-We built this dashboard
+We built this dashboard to visualise conflicts distributed in time and geographically. The events are colour-coded based on the type of conflict (state-based, non-state, and one-sided) and proportional in size to the severity of the event in terms of the number of deaths. The UCDP already has a public dashboard, but we were interested in recreating it to be able to make it better fit our research needs. 
 
 
 **Demo:** [https://yourshinyapp.shinyapps.io/innovation/](https://yourshinyapp.shinyapps.io/innovation/)  
-**Code:** `firm-innovation-app/`
+**Code:** `Geography of Conflicts.R`
 
----
-
-If links expire (Shiny free tier), code remains available and can be run locally.
-
+#### Source: 
+Conflict data: [UCDP Georeferenced Event Dataset (GED)](https://ucdp.uu.se/)
