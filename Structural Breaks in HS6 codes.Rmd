@@ -1,0 +1,524 @@
+---
+title: "Structural Breaks in HS6 codes"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r global, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+
+```{r}
+## Loading the packages
+library(pacman)
+p_load(tidyverse, dplyr, ggplot2, scales, plotly, flexdashboard, tidyr, shiny, rsconnect, readxl, readr, strucchange, kableExtra)
+
+```
+
+```{r}
+## Loading the necessary data
+#setwd("C:/Users/Ciani/OneDrive - Kiel Institut für Weltwirtschaft/Disrputive Technologies/Shiny App/")
+
+igpc_data <- read_csv("data/clean_data.csv", show_col_types = FALSE)
+trade_data <- read_csv("data/trade_data.csv", show_col_types = FALSE)
+patent_data <- read_csv2("data/patent_data.csv")
+ipc_hs_conversion_table <- read_csv("data/ipc_hs_conversion_table.csv", show_col_types = FALSE)
+ipc_definitions <- read_excel("data/IPC_Definitions.xlsx")
+
+```
+
+
+```{r}
+## Cleaning the igpc data
+
+igpc_data <- igpc_data %>%
+  mutate(
+    year = as.integer(year),
+    code = as.character(code),
+    description = as.character(description)
+  ) %>%
+  arrange(description, year)
+
+choices_all_df <- igpc_data %>%
+  distinct(code, description) %>%
+  arrange(description)
+
+choice_igpc <- choices_all_df$code %>%
+  set_names(paste0(choices_all_df$description, " — ", choices_all_df$code))
+
+```
+
+```{r}
+
+## Cleaning the trade data
+
+# Bring in descriptions for labels (reuse from igpc_data)
+desc_map <- igpc_data %>%
+  distinct(code, description)
+
+trade_data$k <- as.character(trade_data$k)
+igpc_data$code <- as.character(igpc_data$code)
+
+trade_data <- trade_data %>%
+  left_join(desc_map, by = c( "k" = "code"))
+
+choices_val_df <- trade_data %>%
+  distinct(k, description) %>%
+  arrange(description)
+
+labels_val <- paste0(choices_val_df$description, " — ", choices_val_df$k)
+choice_trade <- setNames(choices_val_df$k, labels_val)
+
+```
+
+
+```{r}
+
+## Cleaning the patent data
+
+## Cleaning the definitions
+
+ipc_definitions <- ipc_definitions %>%
+  mutate(ipc_definition = tolower(paste(IPC3_definition, IPC4_definition, sep = " - "))) %>%
+  select(IPC4, ipc_definition)
+
+# Join HS6–IPC map with definitions
+hs_ipc_final <- ipc_hs_conversion_table %>%
+  mutate(code = as.character(code), ipc4 = toupper(ipc4)) %>%
+  left_join(ipc_definitions, by = c("ipc4" = "IPC4"))
+
+# Make sure patent_data columns line up (rename if your columns differ)
+patent_data <- patent_data %>%
+  rename(ipc4 = ipc4, year = yr, patents = n_applications) %>%   # adjust if needed
+  mutate(ipc4 = toupper(ipc4), year = as.integer(year))
+
+## choices
+choice_patents <- choice_trade
+
+
+```
+
+# Product Centrality
+
+## Sidebar {.sidebar}
+
+```{r}
+
+selectizeInput(
+  inputId = "hs6_code",
+  label   = "Search or select a Good:",
+  choices = NULL,                 # <- populated from server
+  options = list(
+    placeholder     = 'Type keywords (e.g., "lithium battery")',
+    closeAfterSelect = TRUE
+  )
+)
+
+## Populate choices from the server
+observe({
+  updateSelectizeInput(
+    session,
+    "hs6_code",
+    choices  = choice_igpc,    
+    selected = choice_igpc[[1]],
+    server   = TRUE               
+  )
+})
+```
+
+For this Dashboard, we constructed the Integrated Global Product Centrality Indicator from Fetzer, Lambert, Feld, Garg (2024) based on CEPII's BACI trade data. 
+
+The IGPC has been normalised at 100 in 2002 for all goods. 
+
+The data spans from 2002 to 2023. 
+
+One can search for any HS6 good either by code or description.
+
+## Column 1 
+
+### Centrality Over Time {data-height=650} 
+
+```{r, fill = TRUE}
+
+plotlyOutput("lineplot")  
+
+```
+
+```{r}
+
+output$lineplot <- renderPlotly({
+  req(input$hs6_code)  # ensure a selection exists
+
+  # Filter data by the selected HS6 code
+  filtered_data <- igpc_data %>% filter(code == input$hs6_code)
+
+  validate(
+    need(nrow(filtered_data) > 0, "No data available for the selected HS6 code.")
+  )
+
+  # Build the plot
+  p <- ggplot(filtered_data, aes(x = year, y = igpc_norm, group = 1)) +
+    geom_line(linewidth = 1.2, color = "#3769aa") +
+    geom_point(color = "#01438f") +
+    labs(
+      title = "Centrality in Global Trade",
+      subtitle = names(which(choice_igpc == input$hs6_code))[1],
+      x = "Year",
+      y = "Integrate Global Product Centrality"
+    ) +
+    scale_x_continuous(breaks = pretty(filtered_data$year)) +
+    theme_bw() +
+    theme(
+      plot.title = element_text(face = "bold"),
+      panel.grid.minor = element_blank()
+    )
+
+  ggplotly(p) %>% layout(margin = list(l = 50, r = 10, b = 40, t = 50), autosize = TRUE)
+})
+
+```
+
+### Structural Break test {data-height=350}
+
+```{r}
+
+htmlOutput("break_table")
+
+```
+
+```{r}
+
+output$break_table <- renderUI({
+  req(input$hs6_code)
+
+  df <- igpc_data %>%
+    filter(code == input$hs6_code) %>%
+    arrange(year) %>%
+    select(year, igpc_norm) %>%
+    drop_na()
+
+  validate(need(nrow(df) > 8, "Not enough data for break test"))
+
+  # SupF test for one break in igpc_norm ~ year
+  test <- sctest(igpc_norm ~ year, type = "supF", data = df)
+  stat <- unname(test$statistic)
+  pval <- unname(test$p.value)
+  sig  <- pval < 0.05
+
+  # Estimated break year(s)
+  bp    <- breakpoints(igpc_norm ~ year, data = df)
+  breaks <- df$year[bp$breakpoints]
+  breaks <- breaks[!is.na(breaks)]
+  breaks_str <- if (length(breaks)) paste(breaks, collapse = ", ") else "—"
+
+  # Build a tidy table
+  tab <- tibble::tibble(
+    `Structural Break Test` = c("Test", "F statistic", "p-value", "Significant (5%)", "Estimated break year(s)"),
+    Value = c("supremum F test", sprintf("%.3f", stat), scales::pvalue(pval, accuracy = 0.001),
+              ifelse(sig, "Yes", "No"), breaks_str)
+  )
+
+  # Make a nice kableExtra table
+  kb <- knitr::kable(tab, format = "html", align = c("l", "r"), escape = TRUE) |>
+    kableExtra::kable_styling(full_width = TRUE,
+                              bootstrap_options = c("condensed", "striped", "hover"),
+                              font_size = 15 )
+
+  # Optional: highlight the significance row
+  if (sig) {
+    kb <- kb |> kableExtra::row_spec(4, bold = TRUE)
+  }
+
+  htmltools::HTML(kb)
+})
+
+```
+
+Source: Fetzer, T., Lambert, P. J., Feld, B., & Garg, P. (2024). AI-generated production networks: Measurement and applications to global trade.
+
+# Trade Data
+
+## Sidebar {.sidebar}
+
+```{r}
+selectizeInput(
+  inputId = "hs6_code_val",
+  label   = "Search HS6 good:",
+  choices = NULL,
+  options = list(
+    placeholder = 'Type keywords or a code…',
+    closeAfterSelect = TRUE
+  )
+)
+
+observe({
+  updateSelectizeInput(
+    session,
+    "hs6_code_val",
+    choices  = choice_trade,
+    selected = choice_trade[[1]],
+    server   = TRUE
+  )
+})
+
+```
+
+
+In this case, we have analysed trade value of HS6 goods compared to the average trade value in the HS4 category. 
+
+For this Dashboard, we used CEPII's BACI trade data. 
+
+The trade value has been normalised at 100 in 2002 for all goods. 
+
+The data spans from 2002 to 2023. 
+
+One can search for any HS6 good either by code or description.
+
+## Column 1
+
+### Value of Trade {data-height=650}
+
+```{r}
+
+plotlyOutput("lineplot_val", height = "100%")
+
+```
+
+```{r}
+
+output$lineplot_val <- renderPlotly({
+  req(input$hs6_code_val)
+
+  df <- trade_data %>%
+    filter(k == input$hs6_code_val) %>%
+    arrange(t) %>%
+    drop_na(hs6_index2002, hs4_index2002)
+
+  validate(need(nrow(df) > 0, "No data for this HS6 in the value panel."))
+
+  # Long format for two series
+  plt_df <- df %>%
+    select(t,
+           `HS6 (2002=100)`  = hs6_index2002,
+           `HS4 avg (2002=100)` = hs4_index2002) %>%
+    pivot_longer(-t, names_to = "series", values_to = "index")
+
+  # Build ggplot (let plotly handle the multi-line legend)
+  p <- ggplot(plt_df, aes(x = t, y = index, color = series)) +
+    geom_line(linewidth = 1.2) +
+    geom_point() +
+    labs(
+      title = "Trade Value of goods vs average in their category",  # we’ll set HTML title in layout
+      x = "Year",
+      y = "Trade value index (2002 = 100)",
+      color = NULL
+    ) +
+    theme_bw() +
+    theme(
+      legend.position = "bottom",
+      panel.grid.minor = element_blank()
+    )
+
+  # Two-line HTML title (title + “subtitle” label)
+  sub <- names(which(choice_trade == input$hs6_code_val))[1]
+  title_html <- paste0(
+    "HS6 vs HS4 Average — Trade Value (2002 = 100)",
+    "<br><span style='font-size:12px;'>", htmltools::htmlEscape(sub), "</span>"
+  )
+
+  ggplotly(p, tooltip = c("x", "y", "series")) %>%
+    layout(
+      title = list(text = title_html),
+      margin = list(l = 60, r = 20, b = 40, t = 80),
+      legend = list(orientation = "h")
+    )
+})
+
+```
+
+### Structural Breaks {data-height=350}
+
+```{r}
+
+htmlOutput("break_table_val")
+
+```
+
+```{r}
+output$break_table_val <- renderUI({
+  req(input$hs6_code_val)
+
+  df <- trade_data %>%
+    filter(k == input$hs6_code_val) %>%
+    arrange(t) %>%
+    select(year = t, hs6_index2002) %>%
+    drop_na()
+
+  # Need enough data
+  validate(need(nrow(df) > 8, "Not enough data for break test (need > 8 observations)."))
+
+  n <- nrow(df)
+  k <- 2  # intercept + year
+  h <- max(k + 1, ceiling(0.20 * n))  # e.g. 20% window, and strictly > k
+
+  # If even that won't work, stop with a clear message
+  validate(need(h < n, sprintf(
+    "Series too short for structural break test (n=%d, required minimum segment size=%d).", n, h
+  )))
+
+  # SupF test with matching 'from' = h/n
+  test <- sctest(hs6_index2002 ~ year, type = "supF", data = df, from = h / n)
+  stat <- unname(test$statistic)
+  pval <- unname(test$p.value)
+  sig  <- pval < 0.05
+
+  # Breakpoints with explicit h
+  bp      <- breakpoints(hs6_index2002 ~ year, data = df, h = h)
+  breaks  <- df$year[bp$breakpoints]
+  breaks  <- breaks[!is.na(breaks)]
+  breaks_str <- if (length(breaks)) paste(breaks, collapse = ", ") else "—"
+
+  tab <- tibble::tibble(
+    `Structural Break Test (Trade, HS6 index)` =
+      c("Test", "F statistic", "p-value", "Significant (5%)", "Estimated break year(s)", "Min segment size (h)"),
+    Value = c("supremum F test",
+              sprintf("%.3f", stat),
+              scales::pvalue(pval, accuracy = 0.001),
+              ifelse(sig, "Yes", "No"),
+              breaks_str,
+              h)
+  )
+
+  kb <- knitr::kable(tab, format = "html", align = c("l","r"), escape = TRUE) |>
+    kableExtra::kable_styling(full_width = TRUE,
+                              bootstrap_options = c("condensed","striped","hover"),
+                              font_size = 15)
+  if (sig) kb <- kb |> kableExtra::row_spec(4, bold = TRUE)
+
+  htmltools::HTML(kb)
+})
+
+```
+
+
+# Patent Data
+
+## Sidebar {.sidebar}
+
+
+```{r}
+# Sidebar for patent tab
+selectizeInput(
+  inputId = "hs6_code_pat",
+  label   = "Search HS6 good:",
+  choices = NULL,
+  options = list(
+    placeholder = 'Type keywords (e.g., "lithium battery")',
+    closeAfterSelect = TRUE
+  )
+)
+
+# Populate choices from server
+observe({
+  updateSelectizeInput(
+    session,
+    "hs6_code_pat",
+    choices  = choice_patents,      # <- built earlier from igpc_data
+    selected = choice_patents[[1]],
+    server   = TRUE
+  )
+})
+```
+
+Select the HS code to see the number of patents that are published in the most relevant field and the list of all the relevant fields. 
+
+Source for the HS-IPC links: "Getting patents and economic data to speak to each other: An ‘algorithmic links with probabilities’ approach for joint analyses of patenting and economic activity." Nikolas ZOlas and Travis Lybbert, Research Policy, 43.3 (2014): 530-542.
+
+Source for Patent data: PATSTAT
+
+## Column 1 
+
+### Inventions and Patents Over Time {data-height=650} 
+
+
+```{r}
+
+plotlyOutput("patent_line", height = "100%")
+
+```
+
+
+```{r}
+## Here we show the plot
+output$patent_line <- renderPlotly({
+  req(input$hs6_code_pat)
+
+  prob_col <- "probability_weight"   # change if your prob column has a different name
+
+  # All IPCs for this HS6, ordered by probability
+  hs_ipcs <- hs_ipc_final %>%
+    filter(code == input$hs6_code_pat) %>%
+    arrange(desc(.data[[prob_col]]))
+
+  validate(need(nrow(hs_ipcs) > 0, "No IPC mapping for this HS6 code."))
+
+  # Pick top IPC4
+  top_ipc <- hs_ipcs %>% slice(1) %>% pull(ipc4)
+
+  # Patent series for that IPC4
+  ser <- patent_data %>%
+    filter(ipc4 == top_ipc) %>%
+    arrange(year)
+
+  validate(need(nrow(ser) > 0, "No patent data for this IPC class."))
+
+  sub <- names(which(choice_patents == input$hs6_code_pat))[1]
+  ttl <- paste0("Patents (Most likely IPC4: ", top_ipc, ")",
+                "<br><span style='font-size:12px;'>", htmltools::htmlEscape(sub), "</span>")
+
+  p <- ggplot(ser, aes(year, patents)) +
+    geom_line(linewidth = 1.2, color = "#3769aa") +
+    geom_point(color = "#01438f") +
+    labs(x = "Year", y = "Patent count") +
+    theme_bw() +
+    theme(panel.grid.minor = element_blank())
+
+  ggplotly(p, tooltip = c("x", "y")) %>%
+    layout(title = list(text = ttl),
+           margin = list(l = 60, r = 20, b = 40, t = 80))
+})
+```
+
+### All Relevant IPC Categories
+
+```{r}
+## Here we show the Kable Table with the most probable IPC Categories
+htmlOutput("ipc_table")
+```
+
+```{r}
+output$ipc_table <- renderUI({
+  req(input$hs6_code_pat)
+
+  prob_col <- "probability_weight"   # same caveat as above
+  tbl <- hs_ipc_final %>%
+    filter(code == input$hs6_code_pat) %>%
+    select(IPC4 = ipc4, Probability = all_of(prob_col), Definition = ipc_definition) %>%
+    arrange(desc(Probability))
+
+  validate(need(nrow(tbl) > 0, "No IPC classes found for this HS6 code."))
+
+  kb <- knitr::kable(tbl, format = "html", align = c("c","r","l"), escape = TRUE) %>%
+    kableExtra::kable_styling(full_width = TRUE,
+                              bootstrap_options = c("condensed","striped","hover"),
+                              font_size = 14)
+
+  htmltools::HTML(kb)
+})
+
+```
+
