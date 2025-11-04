@@ -1,7 +1,8 @@
-# Shiny Apps Portfolio
+# Portfolio
 
-This repository contains examples of Shiny dashboards I developed for empirical economic research.
+This repository contains examples of Shiny dashboards I developed for empirical economic research and a webscraper.
 They are not "end-goals" or outputs, but instruments that I have built for myself and my colleagues to have a better overview of the data. 
+
 
 ---
 
@@ -38,4 +39,11 @@ Key features:
 **Code:** `Geography of Conflicts.R`
 
 #### Source: 
-Conflict data: [UCDP Georeferenced Event Dataset (GED)](https://ucdp.uu.se/)
+Conflict data: [UCDP Georeferenced Event Dataset (GED)](https://ucdp.uu.se/)  
+
+
+--- 
+
+### Web Scraper
+
+
